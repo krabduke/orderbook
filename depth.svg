@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260" width="720" height="260" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <rect width="720" height="260" fill="#0F1518"/>
+  <path d="M 360.0,230.0 L 336.8,197.9 L 313.6,153.7 L 290.4,121.3 L 267.2,111.7 L 244.0,104.2 L 220.8,97.0 L 197.6,82.9 L 174.4,76.7 L 151.2,63.4 L 128.0,52.7 L 104.8,39.1 L 81.6,28.7 L 58.4,25.8 L 35.2,22.3 L 12.0,20.0 L 12.0,230.0 Z" fill="#3D6B5A" fill-opacity="0.55" stroke="#5A9B82" stroke-width="1.5"/>
+  <path d="M 360.0,230.0 L 383.2,219.6 L 406.4,212.8 L 429.6,200.8 L 452.8,188.2 L 476.0,178.6 L 499.2,174.8 L 522.4,163.7 L 545.6,159.8 L 568.8,150.8 L 592.0,146.9 L 615.2,145.5 L 638.4,143.2 L 661.6,141.9 L 684.8,138.5 L 708.0,136.3 L 708.0,230.0 Z" fill="#7A3F38" fill-opacity="0.55" stroke="#B4675C" stroke-width="1.5"/>
+  <line x1="360.0" y1="20" x2="360.0" y2="230" stroke="#8A9490" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="12" y="250" fill="#7C918F" font-size="10">49,985</text>
+  <text x="708" y="250" fill="#7C918F" font-size="10" text-anchor="end">50,015</text>
+  <text x="360.0" y="250" fill="#B8C4C2" font-size="10" text-anchor="middle">50,000.0</text>
+  <text x="12" y="14" fill="#B8C4C2" font-size="11">imbalance +0.419 &#183; spread 0.40bp &#183; tilt +0.10bp</text>
+</svg>
