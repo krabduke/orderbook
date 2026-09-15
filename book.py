@@ -123,6 +123,55 @@ class Book:
         return side_slope(self.bids, 1), side_slope(self.asks, -1)
 
 
+def order_flow_imbalance(prev: Book, curr: Book, depth: int = 5) -> float:
+    """Order-flow imbalance between two snapshots, in size units (Cont et al.).
+
+    Almost all of the book's short-horizon information is in how it *changed*,
+    not how it looks: a bid that grew and an ask that shrank both mean buying
+    pressure. Positive means net buying.
+    """
+    ofi = 0.0
+    n = min(depth, len(prev.bids), len(curr.bids), len(prev.asks), len(curr.asks))
+    for i in range(n):
+        pb, qb = curr.bids[i]
+        pb0, qb0 = prev.bids[i]
+        pa, qa = curr.asks[i]
+        pa0, qa0 = prev.asks[i]
+        if pb > pb0:
+            ofi += qb
+        elif pb == pb0:
+            ofi += qb - qb0
+        else:
+            ofi -= qb0
+        if pa < pa0:
+            ofi -= qa
+        elif pa == pa0:
+            ofi -= qa - qa0
+        else:
+            ofi += qa0
+    return ofi
+
+
+def kyle_lambda(books: list[Book], depth: int = 5) -> float:
+    """Price impact per unit of order flow, in bp per size.
+
+    The OLS slope of mid-price change (bp) regressed on order-flow imbalance
+    across consecutive snapshots: a direct analogue of Kyle's lambda, with OFI
+    standing in for signed trade volume, which an L2 feed does not give you.
+    A steep (large) lambda means the book is easily pushed.
+    """
+    if len(books) < 3:
+        raise ValueError("need at least 3 snapshots to estimate impact")
+    xs = [order_flow_imbalance(a, b, depth) for a, b in zip(books, books[1:])]
+    ys = [(b.mid - a.mid) / a.mid * 10_000 for a, b in zip(books, books[1:])]
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    denom = sum((x - mx) ** 2 for x in xs)
+    if denom == 0:
+        return 0.0
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / denom
+
+
 def load_jsonl(path: Path) -> list[Book]:
     """One JSON snapshot per line: {"ts":..., "bids":[[p,s],...], "asks":[...]}"""
     books: list[Book] = []
@@ -222,7 +271,8 @@ def main() -> None:
     args = p.parse_args()
 
     if args.demo or not args.jsonl:
-        books = [synthetic_book(tilt=0.35, seed=7)]
+        books = [synthetic_book(mid=50_000 + 20 * i * i, tilt=0.10 + 0.10 * i, seed=7, ts=float(i))
+                 for i in range(3)]
     else:
         books = load_jsonl(args.jsonl)
         if not books:
@@ -231,6 +281,11 @@ def main() -> None:
     book = books[-1]
     bid_d, ask_d = book.depth_within(10)
     bid_sl, ask_sl = book.slope()
+    if len(books) >= 2:
+        ofi = order_flow_imbalance(books[-2], books[-1])
+    else:
+        ofi = None
+    lam = kyle_lambda(books) if len(books) >= 3 else None
 
     print(f"\n  mid                 {book.mid:>12,.2f}")
     print(f"  spread              {book.spread_bps:>12.3f} bp")
@@ -241,6 +296,10 @@ def main() -> None:
     print()
     print(f"  depth within 10bp   {bid_d:>12,.3f} bid / {ask_d:,.3f} ask")
     print(f"  slope               {bid_sl:>12,.3f} bid / {ask_sl:,.3f} ask  (size per bp)")
+    if ofi is not None:
+        print(f"  OFI (last step)     {ofi:>+12,.3f}          (net size, + buying)")
+    if lam is not None:
+        print(f"  kyle lambda         {lam:>+12.5f}          (bp per size)")
     print()
     for notional in (10_000, 100_000, 1_000_000):
         buy = book.sweep_cost_bps(notional, "buy")

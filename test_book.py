@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from book import Book, depth_svg, synthetic_book
+from book import Book, depth_svg, synthetic_book, order_flow_imbalance, kyle_lambda
 
 
 def flat_book(bid_sizes, ask_sizes, mid=100.0, tick=1.0):
@@ -117,3 +117,58 @@ def test_svg_is_wellformed():
     svg = depth_svg(synthetic_book(seed=4))
     assert svg.startswith("<svg") and svg.rstrip().endswith("</svg>")
     assert svg.count("<path") == 2
+
+
+# ------------------------------------------------------- flow and impact
+
+def test_ofi_zero_when_book_unchanged():
+    assert order_flow_imbalance(flat_book([3, 3], [3, 3]), flat_book([3, 3], [3, 3])) == 0.0
+
+
+def test_ofi_positive_when_bid_grows():
+    assert order_flow_imbalance(flat_book([3], [3]), flat_book([5], [3])) == pytest.approx(2.0)
+
+
+def test_ofi_negative_when_ask_grows():
+    assert order_flow_imbalance(flat_book([3], [3]), flat_book([3], [5])) == pytest.approx(-2.0)
+
+
+def test_ofi_positive_when_ask_shrinks():
+    assert order_flow_imbalance(flat_book([3], [5]), flat_book([3], [3])) == pytest.approx(2.0)
+
+
+def test_ofi_respects_depth_limit():
+    before = flat_book([1, 1], [1, 1])
+    after = flat_book([1, 4], [1, 1])  # size added at level 2 only
+    assert order_flow_imbalance(before, after, depth=1) == 0.0
+    assert order_flow_imbalance(before, after, depth=2) == pytest.approx(3.0)
+
+
+def test_kyle_lambda_needs_three_snapshots():
+    with pytest.raises(ValueError, match="at least 3"):
+        kyle_lambda([flat_book([1], [1]), flat_book([2], [1])])
+
+
+def test_kyle_lambda_zero_when_mid_never_moves():
+    books = [flat_book([1], [1]), flat_book([2], [1]), flat_book([3], [1])]
+    assert kyle_lambda(books) == 0.0
+
+
+def test_kyle_lambda_positive_on_buying_pressure_drift():
+    # Bid size grows faster than the ask, and the mid rises with it.
+    books = [
+        flat_book([1], [1], mid=100.0),
+        flat_book([2], [1], mid=100.5),
+        flat_book([4], [1], mid=101.5),
+    ]
+    assert kyle_lambda(books) > 0
+
+
+def test_kyle_lambda_matches_hand_computed_slope():
+    books = [
+        flat_book([1], [1], mid=100.0),
+        flat_book([2], [1], mid=100.5),
+        flat_book([4], [1], mid=101.5),
+    ]
+    # OFI = [3, 5]; dmid = [50.0, 99.5025] bp; OLS slope = 24.75.
+    assert kyle_lambda(books) == pytest.approx(24.751, abs=0.01)
